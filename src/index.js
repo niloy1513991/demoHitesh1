@@ -1,10 +1,18 @@
 import dotenv from "dotenv";
+import { app } from "./app.js";
 import connectDB from "./db/index.js";
-// Load environment variables from the .env file in the project's root
-dotenv.config({
-    path: "./env",
-});
-
 const port = process.env.PORT;
 
-connectDB();
+dotenv.config({
+  path: "./env",
+});
+
+connectDB()
+  .then(() => {
+    app.listen(port || 8000, () => {
+      console.log("Server is running!");
+    });
+  })
+  .catch((err) => {
+    console.log("Mongodb connection failled!!! - ", err);
+  });
