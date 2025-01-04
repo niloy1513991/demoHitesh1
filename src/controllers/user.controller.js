@@ -3,34 +3,47 @@ import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadOnCoudinary } from "../utils/cloudinary.js";
 
-// Algorithm > 
-  // Get user info from the frontend
-  // Validation + not empty
-  // Check if user / email already exists
-  // Check for images and avatar
-  // If all okay then upload to cloudinary
-  // Create a user object - create entry in mongoDB
-  // Remove pass and refresh token feild from response
-  // Check if user is created > returs response OK or error
+// Algorithm >
+// Get user info from the frontend
+// Validation + not empty
+// Check if user / email already exists
+// Check for images or avatar
+// If all okay then upload to cloudinary
+// Create a user object - create entry in mongoDB
+// Remove pass and refresh token feild from response
+// Check if user is created > returs response OK or error
 
 const registerUser = asyncHandler(async (req, res) => {
+  // Get user info from the frontend
   const { userName, email, fullName, password } = req.body;
-  console.log(email);
+
+  // Validation + not empty
   if (
     [fullName, email, userName, password].some((field) => field?.trim() === "")
   ) {
     throw new ApiError(400, "All fields are required.");
   }
-
-  const existingUser = User.findOne({ $or: [email, userName] });
-
+  // Check if user / email already exists
+  const existingUser = await User.findOne({ $or: [{ email }, { userName }] });
   if (existingUser) throw new ApiError(409, "User already exists!");
 
+  // Check for images or avatar
   const avatarLocalPath = req.files?.avatar[0]?.path;
-  const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  // const coverImageLocalPath = req.files?.coverImage[0]?.path;
+
+  let coverImageLocalPath;
+
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImageLocalPath = req.files.coverImage[0].path;
+  }
 
   if (!avatarLocalPath) throw new ApiError(400, "Avatar is required");
 
+  // If all okay then upload to cloudinary
   const avatar = await uploadOnCoudinary(avatarLocalPath);
   const coverImage = await uploadOnCoudinary(coverImageLocalPath);
 
@@ -38,6 +51,7 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Avatar is required!");
   }
 
+  // Create a user object - create entry in mongoDB
   const user = await User.create({
     fullName,
     avatar: avatar.url,
@@ -47,15 +61,22 @@ const registerUser = asyncHandler(async (req, res) => {
     userName: userName.toLowerCase(),
   });
 
+  // Remove pass and refresh token feild from response
   const createdUser = await User.findById(user._id).select(
     "-password -refreshToken"
   );
 
-  if(!createdUser) {
-    throw new ApiError(500, "Something went wrong while registering a new user.");
+  if (!createdUser) {
+    throw new ApiError(
+      500,
+      "Something went wrong while registering a new user."
+    );
   }
 
-  return res.status(201).json(new Apiresponse(200, createdUser, "User created successfully"))
+  // Check if user is created > returs response OK or error
+  return res
+    .status(201)
+    .json(new Apiresponse(200, createdUser, "User created successfully"));
 });
 
 export { registerUser };
